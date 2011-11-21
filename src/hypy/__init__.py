@@ -8,6 +8,7 @@ import HyPhy as hp
 
 
 __all__ = ['HyphyInterface']
+__version__ = '0.1.0'
 
 
 def _escape(value):
