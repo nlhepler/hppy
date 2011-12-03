@@ -2,7 +2,6 @@
 from copy import deepcopy
 from os import getcwd
 from os.path import abspath, exists, join
-from types import DictionaryType, ListType, StringType, TupleType
 
 import HyPhy as hp
 
@@ -12,9 +11,9 @@ __version__ = '0.1.0'
 
 
 def _escape(value):
-    if not isinstance(value, (float, int, StringType)):
+    if not isinstance(value, (float, int, str)):
         raise ValueError("Cannot escape types other than float, int, or str")
-    return '"%s"' % value.replace('"', r'\"') if isinstance(value, StringType) else repr(value)
+    return '"%s"' % value.replace('"', r'\"') if isinstance(value, str) else repr(value)
 
 
 class HyphyInterface(object):
@@ -54,15 +53,15 @@ class HyphyInterface(object):
                     dim = max(hymat.mRows, hymat.mCols)
                     mat = [0.] * dim
                     if one_d[0]:
-                        for i in xrange(dim):
+                        for i in range(dim):
                             mat[i] = hymat.MatrixCell(0, i)
                     else:
-                        for i in xrange(dim):
+                        for i in range(dim):
                             mat[i] = hymat.MatrixCell(i, 0)
                 else:
                     mat = [[None] * hymat.mCols] * hymat.mRows
-                    for i in xrange(hymat.mRows):
-                        for j in xrange(hymat.mCols):
+                    for i in range(hymat.mRows):
+                        for j in range(hymat.mCols):
                             mat[i][j] = hymat.MatrixCell(i, j)
                 return mat
             else:
@@ -79,33 +78,33 @@ class HyphyInterface(object):
 
     def queuevar(self, name, value):
         execstr = ''
-        if isinstance(value, (ListType, TupleType)):
+        if isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
-                if isinstance(v, (ListType, TupleType)):
+                if isinstance(v, (list, tuple)):
                     if i == 0:
                         execstr += "%s = {%d,%d};\n" % (name, len(value), len(v))
                     for j, w in enumerate(v):
                         if not isinstance(w, (float, int)):
                             raise ValueError("2D matrices must contain values of type float or int")
                         execstr += "%s[%d][%d] = %s;\n" % (name, i, j, repr(w))
-                elif isinstance(v, (float, int, StringType)):
+                elif isinstance(v, (float, int, str)):
                     if i == 0:
                         execstr += "%s = {};\n" % name
                     execstr += "%s[%d] = %s;\n" % (name, i, _escape(v))
                 else:
                     raise ValueError("Lists must contain values of type float, int, or str")
-        elif isinstance(value, DictionaryType):
+        elif isinstance(value, dict):
             initted = False
-            for k, v in value.iteritems():
+            for k, v in value.items():
                 if not initted:
                     execstr += "%s = {};\n" % name
                     initted = True
-                if not isinstance(k, (int, StringType)):
+                if not isinstance(k, (int, str)):
                     raise ValueError("Dictionary keys must be values of type int or str")
-                if not isinstance(v, (float, int, StringType)):
+                if not isinstance(v, (float, int, str)):
                     raise ValueError("Dictionaries must contain values of type float, int, or str")
                 execstr += "%s[%s] = %s;\n" % (name, _escape(k), _escape(v))
-        elif isinstance(value, (float, int, StringType)):
+        elif isinstance(value, (float, int, str)):
             execstr += "%s = %s;\n" % (name, _escape(value))
         else:
             raise ValueError("inject() supports only floats, ints, and strs; lists of the same; and 2d matrices of floats or ints")
