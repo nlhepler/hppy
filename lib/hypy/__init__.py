@@ -2,6 +2,7 @@
 from copy import deepcopy
 from os import getcwd
 from os.path import abspath, exists, join
+from textwrap import dedent
 
 import HyPhy as hp
 
@@ -14,6 +15,23 @@ def _escape(value):
     if not isinstance(value, (float, int, str)):
         raise ValueError("Cannot escape types other than float, int, or str")
     return '"%s"' % value.replace('"', r'\"') if isinstance(value, str) else repr(value)
+
+
+def has_mpi():
+    iface = HyphyInterface()
+    iface.queuecmd(dedent('''
+    hasMPI = 1;
+    if ( !MPI_NODE_COUNT ) {
+        hasMPI = 0;
+    }
+    function _THyPhyAskFor( key ) {
+        if ( key == "hasMPI" ) {
+            return hasMPI;
+        }
+        return "_THyPhy_NOT_HANDLED_";
+    }'''))
+    iface.runqueue()
+    return int(iface.getvar('hasMPI', HyphyInterface.NUMBER)) == 1
 
 
 class HyphyInterface(object):
@@ -127,7 +145,7 @@ class HyphyInterface(object):
         elif len(args) + len(kwargs) != 1:
             raise ValueError(errstr)
 
-        if batchfile is None:
+        if batchfile is None and self._execstr == '':
             if 'batchfile' in kwargs:
                 batchfile = kwargs['batchfile']
             elif 'execstr' in kwargs:
@@ -147,8 +165,6 @@ class HyphyInterface(object):
                 raise ValueError("Invalid batchfile `%s', it doesn't exist!" % batchfile)
         elif execstr is not None:
             self._execstr += execstr
-        else:
-            assert(0)
 
         ret = self._instance.ExecuteBF(self._execstr)
         HyphyInterface._fetchenv(self)
