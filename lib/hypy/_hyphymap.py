@@ -16,7 +16,7 @@ def mpi_node_count():
     iface.queuecmd(dedent('''
     function _THyPhyAskFor( key ) {
         if ( key == "MPI" ) {
-            return MPI_NODE_COUNT 
+            return ( MPI_NODE_COUNT-1 ); 
         }
         return "_THyPhy_NOT_HANDLED_";
     }'''))
@@ -33,9 +33,8 @@ class HyphyMap(object):
         self._retvar = retvar
 
     def map(self, argslist):
-        node_count = mpi_node_count()
         numjobs = len(argslist)
-        if node_count:
+        if mpi_node_count() > 0:
             # message passing interface
             iface = HyphyInterface()
             cmd = dedent('''\
