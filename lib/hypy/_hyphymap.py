@@ -36,7 +36,7 @@ class HyphyMap(object):
         node_count = mpi_node_count()
         numjobs = len(argslist)
         if node_count:
-            # multiprocessing
+            # message passing interface
             iface = HyphyInterface()
             cmd = dedent('''\
             _job = 0;
@@ -96,5 +96,5 @@ class HyphyMap(object):
             iface.runqueue()
             return [ iface.getvar("val%d" % i, HyphyInterface.STRING) for i in range(numjobs) ]
         else:
-            # fork using multiprocessing
+            # multiprocessing
             pass
