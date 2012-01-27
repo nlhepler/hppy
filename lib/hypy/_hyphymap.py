@@ -62,7 +62,7 @@ class HyphyMap(object):
                     _mpicmds * ( "_retstr * 0;" );
                     _mpicmds * ( "return _retstr;" );
                     _mpicmds * 0;
-                    MPISend( _node + 1, _mpicmds );
+                    MPISend( _node+1, _mpicmds );
                     _nodestates[ _node ][ 0 ] = 1;
                     _nodestates[ _node ][ 1 ] = Time(0);
                     _job += 1;
