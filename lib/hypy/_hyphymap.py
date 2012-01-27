@@ -41,7 +41,7 @@ class HyphyMap(object):
             cmd = dedent('''\
             _job = 0;
             _jobopts = {};
-            %(jobopts)
+            %(jobopts)s
             _jobvals = {};
             _nodestates = { MPI_NODE_COUNT-1, 2 };
             _received = 0;
