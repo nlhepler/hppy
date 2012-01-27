@@ -54,7 +54,7 @@ class HyphyMap(object):
                     _mpicmds = "";
                     _mpicmds * 128;
                     _mpicmds * ( "_options = " + _jobopts[ _job ] + ";" );
-                    _mpicmds * ( "ExecuteAFile( %(batchfile)s );" );
+                    _mpicmds * ( "ExecuteAFile( %(batchfile)s, _options );" );
                     _mpicmds * ( "_retstr = \"\";" );
                     _mpicmds * ( "_retstr * 128;" );
                     _mpicmds * ( "_retstr * ( \"_retjob = \" + " + _job + " + \";\" );" );
