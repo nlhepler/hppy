@@ -84,12 +84,13 @@ class HyphyMap(object):
                 ) for i, args in enumerate(argslist)),
                 'numjobs': numjobs,
                 'retvar': self._retvar,
-                'typhyexprs': '\n    '.join(dedent('''\
+                'typhyexprs': '\n'.join(dedent('''\
                     if ( key == "val%(jobid)d" ) {
                             return _jobvals[ %(jobid)d ];
-                        }''') % {
+                    }
+                $''') % {
                     'jobid': i
-                } for i in range(numjobs))
+                } for i in range(numjobs)).lstrip().rstrip('\n$')
             }
             iface.queuecmd(cmd)
             iface.runqueue()
