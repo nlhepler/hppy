@@ -11,7 +11,7 @@ __all__ = ['HyphyInterface', 'escape']
 
 def escape(value):
     if not isinstance(value, (float, int, str)):
-        raise ValueError("Cannot escape types other than float, int, or str")
+        raise ValueError("Cannot escape types other than float, int, or str: '%s'" % repr(value))
     return '"%s"' % value.replace('"', r'\"') if isinstance(value, str) else repr(value)
 
 
