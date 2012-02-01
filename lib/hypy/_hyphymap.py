@@ -9,6 +9,7 @@ from subprocess import PIPE, Popen
 from sys import stderr
 from tempfile import mkstemp
 from textwrap import dedent
+from warnings import warn
 
 from fakemp import farmout, farmworker
 
@@ -18,7 +19,18 @@ from ._hyphyinterface import HyphyInterface, escape
 __all__ = ['HyphyMap', 'mpi_node_count']
 
 
-def run_hyphympi(cmds):
+def _mpienvvar():
+    try:
+        node_count = int(getenv('MPI', '0'))
+    except ValueError:
+        warn('the MPI env var should specify the desired number of nodes, defaulting to 0')
+        node_count = 0
+    return node_count
+
+
+def _runhyphympi(cmds, node_count=None):
+    if node_count is None:
+        node_count = _mpienvvar()
     fd, filename = mkstemp(); close(fd)
     try:
         with open(filename, 'w') as fh:
@@ -27,7 +39,7 @@ def run_hyphympi(cmds):
         p = Popen(
             ['HYPHYMPI', filename],
             env={
-                'NP': getenv('MPI', '0'),
+                'NP': '%d' % node_count,
                 'PATH': getenv('PATH', '/usr/local/bin:/usr/bin:/bin')
             },
             stderr=PIPE, stdout=PIPE
@@ -49,12 +61,16 @@ def run_hyphympi(cmds):
 
 
 def mpi_node_count():
-    try:
-        # use MPI_NODE_COUNT - 1 so we don't count the root process
-        cmds = 'fprintf( stdout, "" + (MPI_NODE_COUNT - 1) );'
-        retcode, pout, perr = run_hyphympi(cmds)
-        node_count = int(pout)
-    except ValueError:
+    node_count = _mpienvvar()
+    if node_count > 1:
+        try:
+            # use MPI_NODE_COUNT - 1 so we don't count the root process
+            cmds = 'fprintf( stdout, "" + (MPI_NODE_COUNT - 1) );'
+            retcode, pout, perr = _runhyphympi(cmds)
+            node_count = int(pout)
+        except ValueError:
+            node_count = 0
+    else:
         node_count = 0
     return node_count
 
@@ -221,7 +237,7 @@ class HyphyMap(object):
                 pwr = 2 ** nslash - 1
                 cmds = cmds.replace('"{%d}' % nslash, ('\\' * pwr) + '"')
 
-            retcode, pout, perr = run_hyphympi(cmds)
+            retcode, pout, perr = _runhyphympi(cmds)
 
             # the following no longer makes sense given the child process nature
             # of how we call hyphympi
