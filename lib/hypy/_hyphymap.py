@@ -23,24 +23,24 @@ def run_hyphympi(cmds):
         with open(filename, 'w') as fh:
             fh.write(cmds)
         p = Popen(['HYPHYMPI', filename], env={ 'NP': '33' })
-        stdout, stderr = p.communicate()
+        pout, perr = p.communicate()
         retcode = p.returncode
     except OSError as e:
         retcode = 1
-        stdout, stderr = '', e.strerror
+        pout, perr = '', e.strerror
     finally:
         # make sure to clean up
         if exists(filename):
             remove(filename)
 
-    return (retcode, stdout, stderr)
+    return (retcode, pout, perr)
 
 
 def mpi_node_count():
     cmds = 'fprintf( stdout, "" + MPI_NODE_COUNT );'
     try:
-        retcode, stdout, sterr = run_hyphympi(cmds)
-        node_count = int(stdout)
+        retcode, pout, perr = run_hyphympi(cmds)
+        node_count = int(pout)
     except ValueError:
         node_count = 0
     return node_count
@@ -189,17 +189,17 @@ class HyphyMap(object):
                 'thyphyexprs': _thyphyexprs(numjobs)
             }
 
-            retcode, stdout, stderr = run_hyphympi(cmds)
+            retcode, pout, perr = run_hyphympi(cmds)
 
             # the following no longer makes sense given the child process nature
             # of how we call hyphympi
 
             # if not quiet:
-            #     if stdout != '':
-            #         print(stdout, file=stderr)
+            #     if pout != '':
+            #         print(pout, file=stderr)
 
-            if stderr != '':
-                raise RuntimeError(stderr)
+            if perr != '':
+                raise RuntimeError(perr)
 
             # this is a hideous parser for the outermost
             # json-esque array that the script above outputs
@@ -208,7 +208,7 @@ class HyphyMap(object):
             i = 1
             nb = 0
             retarr = []
-            for j, c in enumerate(stdout):
+            for j, c in enumerate(pout):
                 # every time we encounter a '[', increment nb
                 if c == '[':
                     nb += 1
@@ -218,7 +218,7 @@ class HyphyMap(object):
                 # if we're at a comma and nb == 1, we're in the outer list
                 # so split from the last time we split to j-1
                 if c == ',' and nb == 1:
-                    retarr.append(stdout[i:j])
+                    retarr.append(pout[i:j])
                     i = j + 1
 
             return retarr
