@@ -2,8 +2,11 @@
 from itertools import chain
 from math import ceil, log10
 from multiprocessing import cpu_count, current_process
+from os import close, remove
 from os.path import abspath, exists
+from subprocess import PIPE, Popen
 from sys import stderr
+from tempfile import mkstemp
 from textwrap import dedent
 
 from fakemp import farmout, farmworker
@@ -14,17 +17,33 @@ from ._hyphyinterface import HyphyInterface, escape
 __all__ = ['HyphyMap', 'mpi_node_count']
 
 
+def run_hyphympi(cmds):
+    fd, filename = mkstemp(); close(fd)
+    try:
+        with open(filename, 'w') as fh:
+            fh.write(cmds)
+        p = Popen(['HYPHYMPI', filename], env={ 'NP': '33' })
+        stdout, stderr = p.communicate()
+        retcode = p.returncode
+    except OSError as e:
+        retcode = 1
+        stdout, stderr = '', e.strerror
+    finally:
+        # make sure to clean up
+        if exists(filename):
+            remove(filename)
+
+    return (retcode, stdout, stderr)
+
+
 def mpi_node_count():
-    iface = HyphyInterface()
-    iface.queuecmd(dedent('''
-    function _THyPhyAskFor( key ) {
-        if ( key == "MPI" ) {
-            return ( MPI_NODE_COUNT-1 );
-        }
-        return "_THyPhy_NOT_HANDLED_";
-    }'''))
-    iface.runqueue()
-    return int(iface.getvar('MPI', HyphyInterface.NUMBER))
+    cmds = 'fprintf( stdout, "" + MPI_NODE_COUNT );'
+    try:
+        retcode, stdout, sterr = run_hyphympi(cmds)
+        node_count = int(stdout)
+    except ValueError:
+        node_count = 0
+    return node_count
 
 
 def _quicksize(value):
@@ -49,7 +68,7 @@ def _jobopts(argslist):
 
 
 def _globalvars(varsdict):
-    return '\n'.join('%s = %s;' % (k, escape(v)) for k, v in varslist.items())
+    return '\n'.join('%s = %s;' % (k, escape(v)) for k, v in varsdict.items())
 
 
 def _thyphyexprs(numjobs):
@@ -65,7 +84,7 @@ def _thyphyexprs(numjobs):
 def _jobdispatch(batchfile, retvar, argslist, quiet=True):
     numjobs = len(argslist)
     iface = HyphyInterface()
-    cmd = dedent('''\
+    cmds = dedent('''\
     _job = 0;
     %(jobopts)s
     _jobvals = {};
@@ -83,7 +102,7 @@ def _jobdispatch(batchfile, retvar, argslist, quiet=True):
         'jobopts': _jobopts(argslist),
         'thyphyexprs': _thyphyexprs(numjobs),
     }
-    iface.queuecmd(cmd)
+    iface.queuecmd(cmds)
     iface.runqueue()
 
     if not quiet:
@@ -96,6 +115,7 @@ def _jobdispatch(batchfile, retvar, argslist, quiet=True):
         raise RuntimeError(iface.stderr)
 
     return [ iface.getvar('val%d' % i, HyphyInterface.STRING) for i in range(numjobs) ]
+
 
 class HyphyMap(object):
 
@@ -120,8 +140,8 @@ class HyphyMap(object):
         numjobs = len(argslist)
         if self._mpi:
             # message passing interface
-            iface = HyphyInterface()
-            cmd = dedent('''\
+            cmds = dedent('''\
+            GLOBAL_FPRINTF_REDIRECT = "/dev/null";
             _job = 0;
             %(jobopts)s
             _jobvals = {};
@@ -155,10 +175,12 @@ class HyphyMap(object):
                     _received += 1;
                 }
             }
-            function _THyPhyAskFor( key ) {
-                %(thyphyexprs)s
-                return "_THyPhy_NOT_HANDLED_";
+            GLOBAL_FPRINTF_REDIRECT = "";
+            fprintf( stdout, "[" + _jobvals[ 0 ] ); 
+            for ( _job = 1; _job < %(numjobs)d; _job += 1 ) {
+                fprintf ( stdout, "," + _jobvals[ _job ] );
             }
+            fprintf( stdout, "]" );
             ''') % {
                 'batchfile': escape(self._batchfile),
                 'numjobs': numjobs,
@@ -166,19 +188,40 @@ class HyphyMap(object):
                 'jobopts': _jobopts(argslist),
                 'thyphyexprs': _thyphyexprs(numjobs)
             }
-            iface.queuecmd(cmd)
-            iface.runqueue()
 
-            if not quiet:
-                if iface.stdout != '':
-                    print(iface.stdout, file=stderr)
-                if iface.warnings != '':
-                    print(iface.warnings, file=stderr)
+            retcode, stdout, stderr = run_hyphympi(cmds)
 
-            if iface.stderr != '':
-                raise RuntimeError(iface.stderr)
+            # the following no longer makes sense given the child process nature
+            # of how we call hyphympi
 
-            return [ iface.getvar('val%d' % i, HyphyInterface.STRING) for i in range(numjobs) ]
+            # if not quiet:
+            #     if stdout != '':
+            #         print(stdout, file=stderr)
+
+            if stderr != '':
+                raise RuntimeError(stderr)
+
+            # this is a hideous parser for the outermost
+            # json-esque array that the script above outputs
+
+            # start at 1 because the first char is a '['
+            i = 1
+            nb = 0
+            retarr = []
+            for j, c in enumerate(stdout):
+                # every time we encounter a '[', increment nb
+                if c == '[':
+                    nb += 1
+                # likewise, if we encounter a closing bracket, decrement
+                if c == ']':
+                    nb -= 1
+                # if we're at a comma and nb == 1, we're in the outer list
+                # so split from the last time we split to j-1
+                if c == ',' and nb == 1:
+                    retarr.append(stdout[i:j])
+                    i = j + 1
+
+            return retarr
         else:
             # multiprocessing
             numjobs = len(argslist)
