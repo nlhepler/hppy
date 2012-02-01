@@ -27,7 +27,7 @@ def run_hyphympi(cmds):
         p = Popen(
             ['HYPHYMPI', filename],
             env={
-                'NP': '33',
+                'NP': getenv('MPI', '0'),
                 'PATH': getenv('PATH', '/usr/local/bin:/usr/bin:/bin')
             },
             stderr=PIPE, stdout=PIPE
@@ -50,13 +50,10 @@ def run_hyphympi(cmds):
 
 def mpi_node_count():
     try:
-        use_mpi = True if getenv('MPI', '0').lower() in ('true', '1') else False
-        if use_mpi:
-            cmds = 'fprintf( stdout, "" + (MPI_NODE_COUNT - 1) );'
-            retcode, pout, perr = run_hyphympi(cmds)
-            node_count = int(pout)
-        else:
-            node_count = 0
+        # use MPI_NODE_COUNT - 1 so we don't count the root process
+        cmds = 'fprintf( stdout, "" + (MPI_NODE_COUNT - 1) );'
+        retcode, pout, perr = run_hyphympi(cmds)
+        node_count = int(pout)
     except ValueError:
         node_count = 0
     return node_count
