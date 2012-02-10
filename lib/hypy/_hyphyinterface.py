@@ -110,28 +110,34 @@ class HyphyInterface(object):
         self._execstr += execstr
 
     def reset(self):
+        # XXX: clear self._execstr??? 
         self._instance.ClearAll()
         self._stderr = ''
         self._stdout = ''
         self._warnings = ''
 
     def runqueue(self, *args, **kwargs):
-        batchfile = None
-        execstr = None
+        batchfile = kwargs.pop('batchfile', None)
+        execstr = kwargs.pop('execstr', None)
 
-        errstr = "runqueue() takes a two optional arguments: a HyPhy batchfile or a str containing HyPhy commands"
+        errstr = "runqueue() takes a two optional arguments: a HyPhy 'batchfile' or an 'execstr' containing HyPhy commands"
 
-        if batchfile is None and self._execstr == '':
-            if 'batchfile' in kwargs:
-                batchfile = kwargs['batchfile']
-            elif 'execstr' in kwargs:
-                execstr = kwargs['execstr']
-            elif len(args) > 0 and exists(args[0]):
-                batchfile = args[0]
-            elif len(args) > 0 and args[0].strip()[-1] == ';':
-                execstr = args[0]
-            else:
-                raise ValueError(errstr)
+        # if not already provided by kwargs,
+        # pop vars from args (if they're there)
+        if execstr is None:
+            if len(args) > 1:
+                execstr = args.pop(1)
+        if batchfile is None:
+            if len(args) > 0 and exists(args[0]):
+                batchfile = args.pop(0)
+
+        if len(args) > 0 or len(kwargs) > 0:
+            raise ValueError(errstr)
+
+        # if the execstr wasn't provided,
+        # grab the instance one
+        if execstr is None:
+            execstr = self._execstr
 
         # if we weren't given a batchfile in runqueue,
         # grab the instance one
@@ -141,13 +147,11 @@ class HyphyInterface(object):
         if batchfile is not None:
             if exists(batchfile):
                 with open(batchfile) as fh:
-                    self._execstr += fh.read()
+                    execstr += fh.read()
             else:
                 raise ValueError("Invalid batchfile `%s', it doesn't exist!" % batchfile)
-        elif execstr is not None:
-            self._execstr += execstr
 
-        ret = self._instance.ExecuteBF(self._execstr)
+        ret = self._instance.ExecuteBF(execstr)
         HyphyInterface._fetchenv(self)
         return ret
 
