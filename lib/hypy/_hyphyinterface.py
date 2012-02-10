@@ -119,12 +119,7 @@ class HyphyInterface(object):
         batchfile = None
         execstr = None
 
-        errstr = "run() takes a single argument: a HyPhy batchfile or a str containing HyPhy commands"
-
-        if len(args) + len(kwargs) == 0:
-            batchfile = self._batchfile
-        elif len(args) + len(kwargs) != 1:
-            raise ValueError(errstr)
+        errstr = "runqueue() takes a two optional arguments: a HyPhy batchfile or a str containing HyPhy commands"
 
         if batchfile is None and self._execstr == '':
             if 'batchfile' in kwargs:
@@ -137,6 +132,11 @@ class HyphyInterface(object):
                 execstr = args[0]
             else:
                 raise ValueError(errstr)
+
+        # if we weren't given a batchfile in runqueue,
+        # grab the instance one
+        if batchfile is None:
+            batchfile = self._batchfile
 
         if batchfile is not None:
             if exists(batchfile):
