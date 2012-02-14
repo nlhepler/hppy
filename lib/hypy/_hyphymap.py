@@ -88,7 +88,7 @@ def _jobopts(argslist):
                 (',\n' + (' ' * (18 + _quicksize(i)) )).join('%s: %s' % (
                     # this shit is required because keys are string-sorted, so "10" comes before "2" 
                     '"%s%d"' % ('0' * (_quicksize(len(args) - 1) - _quicksize(j)), j),
-                    '"%d"' % v if isinstance(v, int) else escape(v)
+                    '"%s"' % repr(v) if isinstance(v, (int, float)) else escape(v)
                 ) for j, v in enumerate(args)) if args is not None else ''
             ) for i, args in enumerate(argslist))
         )
