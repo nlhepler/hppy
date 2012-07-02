@@ -79,7 +79,9 @@ class HyphyInterface(object):
 
     def queuevar(self, name, value):
         execstr = ''
-        if isinstance(value, (list, tuple)):
+        if hasattr(value, '_tohyphy'):
+            execstr += value._tohyphy(name)
+        elif isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
                 if isinstance(v, (list, tuple)):
                     if i == 0:
@@ -112,7 +114,7 @@ class HyphyInterface(object):
         self._execstr += execstr
 
     def reset(self):
-        # XXX: clear self._execstr??? 
+        # XXX: clear self._execstr???
         self._instance.ClearAll()
         self._stderr = ''
         self._stdout = ''
