@@ -8,13 +8,50 @@ from os.path import abspath, exists, join
 import HyPhy as hp
 
 
-__all__ = ['HyphyInterface', 'escape']
+__all__ = ['HyphyInterface', 'escape', 'tohyphy']
 
 
 def escape(value):
     if not isinstance(value, (float, int, str)):
         raise ValueError("Cannot escape types other than float, int, or str: '%s'" % repr(value))
     return '"%s"' % value.replace('"', r'\"') if isinstance(value, str) else repr(value)
+
+
+def tohyphy(name, value):
+    execstr = ''
+    if hasattr(value, '_tohyphy'):
+        execstr += value._tohyphy(name)
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value):
+            if isinstance(v, (list, tuple)):
+                if i == 0:
+                    execstr += "%s = {%d,%d};\n" % (name, len(value), len(v))
+                for j, w in enumerate(v):
+                    if not isinstance(w, (float, int)):
+                        raise ValueError("2D matrices must contain values of type float or int")
+                    execstr += "%s[%d][%d] = %s;\n" % (name, i, j, repr(w))
+            elif isinstance(v, (float, int, str)):
+                if i == 0:
+                    execstr += "%s = {};\n" % name
+                execstr += "%s[%d] = %s;\n" % (name, i, escape(v))
+            else:
+                raise ValueError("Lists must contain values of type float, int, or str")
+    elif isinstance(value, dict):
+        initted = False
+        for k, v in value.items():
+            if not initted:
+                execstr += "%s = {};\n" % name
+                initted = True
+            if not isinstance(k, (int, str)):
+                raise ValueError("Dictionary keys must be values of type int or str")
+            if not isinstance(v, (float, int, str)):
+                raise ValueError("Dictionaries must contain values of type float, int, or str")
+            execstr += "%s[%s] = %s;\n" % (name, escape(k), escape(v))
+    elif isinstance(value, (float, int, str)):
+        execstr += "%s = %s;\n" % (name, escape(value))
+    else:
+        raise ValueError("inject() supports only floats, ints, and strs; lists of the same; and 2d matrices of floats or ints")
+    return execstr
 
 
 class HyphyInterface(object):
@@ -78,40 +115,7 @@ class HyphyInterface(object):
         self._execstr += '%s = "";\n%s * %d;\n' % (name, name, size)
 
     def queuevar(self, name, value):
-        execstr = ''
-        if hasattr(value, '_tohyphy'):
-            execstr += value._tohyphy(name)
-        elif isinstance(value, (list, tuple)):
-            for i, v in enumerate(value):
-                if isinstance(v, (list, tuple)):
-                    if i == 0:
-                        execstr += "%s = {%d,%d};\n" % (name, len(value), len(v))
-                    for j, w in enumerate(v):
-                        if not isinstance(w, (float, int)):
-                            raise ValueError("2D matrices must contain values of type float or int")
-                        execstr += "%s[%d][%d] = %s;\n" % (name, i, j, repr(w))
-                elif isinstance(v, (float, int, str)):
-                    if i == 0:
-                        execstr += "%s = {};\n" % name
-                    execstr += "%s[%d] = %s;\n" % (name, i, escape(v))
-                else:
-                    raise ValueError("Lists must contain values of type float, int, or str")
-        elif isinstance(value, dict):
-            initted = False
-            for k, v in value.items():
-                if not initted:
-                    execstr += "%s = {};\n" % name
-                    initted = True
-                if not isinstance(k, (int, str)):
-                    raise ValueError("Dictionary keys must be values of type int or str")
-                if not isinstance(v, (float, int, str)):
-                    raise ValueError("Dictionaries must contain values of type float, int, or str")
-                execstr += "%s[%s] = %s;\n" % (name, escape(k), escape(v))
-        elif isinstance(value, (float, int, str)):
-            execstr += "%s = %s;\n" % (name, escape(value))
-        else:
-            raise ValueError("inject() supports only floats, ints, and strs; lists of the same; and 2d matrices of floats or ints")
-        self._execstr += execstr
+        self._execstr += tohyphy(name, value)
 
     def reset(self):
         # XXX: clear self._execstr???

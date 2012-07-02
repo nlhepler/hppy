@@ -15,7 +15,7 @@ from warnings import warn
 
 from fakemp import farmout, farmworker
 
-from ._hyphyinterface import HyphyInterface, escape
+from ._hyphyinterface import HyphyInterface, escape, tohyphy
 
 
 __all__ = ['HyphyMap', 'mpi_node_count']
@@ -83,12 +83,12 @@ def _quicksize(value):
 
 def _jobopts(argslist):
     if isinstance(argslist, (list, tuple)):
-        # both key and value must be strings or Hyphy bugs out 
+        # both key and value must be strings or Hyphy bugs out
         return '_jobopts = {};\n' + (
             '\n'.join('_jobopts[ %d ] = { %s };' % (
                 i,
                 (',\n' + (' ' * (18 + _quicksize(i)) )).join('%s: %s' % (
-                    # this shit is required because keys are string-sorted, so "10" comes before "2" 
+                    # this shit is required because keys are string-sorted, so "10" comes before "2"
                     '"%s%d"' % ('0' * (_quicksize(len(args) - 1) - _quicksize(j)), j),
                     '"%s"' % repr(v) if isinstance(v, (int, float)) else escape(v)
                 ) for j, v in enumerate(args)) if args is not None else ''
@@ -99,7 +99,7 @@ def _jobopts(argslist):
 
 
 def _globalvars(varsdict):
-    return '\n'.join('%s = %s;' % (k, escape(v)) for k, v in varsdict.items())
+    return '\n'.join(tohyphy(k, v) for k, v in varsdict.items())
 
 
 def _thyphyexprs(numjobs):
@@ -112,10 +112,11 @@ def _thyphyexprs(numjobs):
     } for i in range(numjobs)).lstrip().rstrip('\n$')
 
 
-def _jobdispatch(batchfile, retvar, argslist, quiet=True):
+def _jobdispatch(batchfile, retvar, globals, argslist, quiet=True):
     numjobs = len(argslist)
     iface = HyphyInterface()
     cmds = dedent('''\
+    %(globals)s
     _job = 0;
     %(jobopts)s
     _jobvals = {};
@@ -128,9 +129,10 @@ def _jobdispatch(batchfile, retvar, argslist, quiet=True):
         return "_THyPhy_NOT_HANDLED_";
     }''') % {
         'batchfile': batchfile,
+        'globals': globals,
+        'jobopts': _jobopts(argslist),
         'numjobs': numjobs,
         'retvar': retvar,
-        'jobopts': _jobopts(argslist),
         'thyphyexprs': _thyphyexprs(numjobs),
     }
     iface.queuecmd(cmds)
@@ -192,6 +194,7 @@ class HyphyMap(object):
                     if ( ! _recvjob ) {
                         _mpicmds = "";
                         _mpicmds * 256;
+                        _mpicmds * ( "%(globalvars)s;" );
                         _mpicmds * ( "MESSAGE_LOGGING = 0;" );
                         _mpicmds * ( "_options = " + _jobopts[ _job ] + ";" );
                         _mpicmds * ( "ExecuteAFile( "{1}%(batchfile)s"{1}, _options );" );
@@ -216,13 +219,14 @@ class HyphyMap(object):
                 }
             }
             GLOBAL_FPRINTF_REDIRECT = "";
-            fprintf( stdout, "[" + _jobvals[ 0 ] ); 
+            fprintf( stdout, "[" + _jobvals[ 0 ] );
             for ( _job = 1; _job < %(numjobs)d; _job += 1 ) {
                 fprintf ( stdout, "," + _jobvals[ _job ] );
             }
             fprintf( stdout, "]" );
             ''') % {
                 'batchfile': self._batchfile,
+                'globalvars': _globalvars(globalvars).replace('\n', ''),
                 'numjobs': numjobs,
                 'retvar': self._retvar,
                 'jobopts': _jobopts(argslist),
@@ -271,19 +275,21 @@ class HyphyMap(object):
                     retarr.append(pout[i:j])
                     i = j + 1
 
-            # don't forget the final piece 
+            # don't forget the final piece
             retarr.append(pout[i:(j + nb)])
 
             return retarr
         else:
             # multiprocessing
             numjobs = len(argslist)
+            globals = _globalvars(globalvars)
             results = farmout(
                 num=numjobs,
                 setup=lambda i: (
                     _jobdispatch,
                     self._batchfile,
                     self._retvar,
+                    globals,
                     (argslist[i],),
                     quiet
                 ),
