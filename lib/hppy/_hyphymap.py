@@ -194,7 +194,7 @@ class HyphyMap(object):
                     if ( ! _recvjob ) {
                         _mpicmds = "";
                         _mpicmds * 256;
-                        _mpicmds * ( "%(globalvars)s;" );
+                        _mpicmds * ( "%(globalvars)s" );
                         _mpicmds * ( "MESSAGE_LOGGING = 0;" );
                         _mpicmds * ( "_options = " + _jobopts[ _job ] + ";" );
                         _mpicmds * ( "ExecuteAFile( "{1}%(batchfile)s"{1}, _options );" );
@@ -226,14 +226,14 @@ class HyphyMap(object):
             fprintf( stdout, "]" );
             ''') % {
                 'batchfile': self._batchfile,
-                'globalvars': _globalvars(globalvars).replace('\n', ''),
+                'globalvars': _globalvars(globalvars).replace('\n', '\\n').replace('"', '\\"'),
                 'numjobs': numjobs,
                 'retvar': self._retvar,
                 'jobopts': _jobopts(argslist),
             }
 
             # this facility helps us write code that doesn't break
-            # by allowing us to escape quotations the appropriately:
+            # by allowing us to escape quotations appropriately:
             # by depth
             digits = set()
             for m in finditer(r'"{(\d+)}', cmds):
