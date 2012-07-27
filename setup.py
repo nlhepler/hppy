@@ -19,5 +19,5 @@ setup(name='hppy',
       license='GNU GPL version 3',
       packages=['hppy'],
       package_dir={'hppy': 'lib/hppy'},
-      requires=['HyPhy (>=0.1)']
+      requires=['HyPhy (>=0.1)', 'fakemp']
      )
