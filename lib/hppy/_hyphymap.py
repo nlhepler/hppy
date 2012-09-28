@@ -169,7 +169,7 @@ class HyphyMap(object):
     def nodes(self):
         return self._nodes
 
-    def map(self, argslist, globalvars, quiet=True):
+    def map(self, argslist, globalvars={}, quiet=True):
         numjobs = len(argslist)
         if self._mpi:
             # message passing interface
